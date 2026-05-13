@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Rasbandit/engram-deployer/internal/oidctest"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 // validClaims returns a claim set that should pass every gate, given
 // the matching config from validConfig.
-func validClaims(iss *testIssuer, jti string) jwt.MapClaims {
+func validClaims(jti string) jwt.MapClaims {
 	now := time.Now()
 	return jwt.MapClaims{
 		"iss":          "https://token.actions.githubusercontent.com",
@@ -27,7 +28,7 @@ func validClaims(iss *testIssuer, jti string) jwt.MapClaims {
 	}
 }
 
-func validConfig(iss *testIssuer) OIDCConfig {
+func validConfig(iss *oidctest.Issuer) OIDCConfig {
 	return OIDCConfig{
 		JWKSURL:     iss.JWKSURL(),
 		Issuer:      "https://token.actions.githubusercontent.com",
@@ -39,13 +40,13 @@ func validConfig(iss *testIssuer) OIDCConfig {
 }
 
 func TestOIDCValidator_AcceptsValidToken(t *testing.T) {
-	iss := getSharedIssuer(t)
+	iss := oidctest.Shared(t)
 	v, err := NewValidator(context.Background(), validConfig(iss))
 	if err != nil {
 		t.Fatalf("validator init: %v", err)
 	}
 
-	token := iss.Mint(t, validClaims(iss, "test-jti-1"))
+	token := iss.Mint(t, validClaims("test-jti-1"))
 
 	claims, err := v.Validate(token)
 	if err != nil {
@@ -59,7 +60,7 @@ func TestOIDCValidator_AcceptsValidToken(t *testing.T) {
 // Each row mutates exactly one claim away from the valid set and asserts
 // the validator rejects. If any row accepts, that gate is missing.
 func TestOIDCValidator_RejectsInvalidClaims(t *testing.T) {
-	iss := getSharedIssuer(t)
+	iss := oidctest.Shared(t)
 	v, err := NewValidator(context.Background(), validConfig(iss))
 	if err != nil {
 		t.Fatalf("validator init: %v", err)
@@ -91,7 +92,7 @@ func TestOIDCValidator_RejectsInvalidClaims(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			claims := validClaims(iss, "jti-"+tc.name)
+			claims := validClaims("jti-" + tc.name)
 			tc.mutate(claims)
 			token := iss.Mint(t, claims)
 
@@ -105,15 +106,15 @@ func TestOIDCValidator_RejectsInvalidClaims(t *testing.T) {
 // alg=none and similar algorithm-confusion attacks must be refused
 // regardless of claim values.
 func TestOIDCValidator_RejectsAlgNone(t *testing.T) {
-	iss := getSharedIssuer(t)
+	iss := oidctest.Shared(t)
 	v, err := NewValidator(context.Background(), validConfig(iss))
 	if err != nil {
 		t.Fatalf("validator init: %v", err)
 	}
 
 	// Build a token with alg=none by hand (golang-jwt refuses to sign one).
-	token := jwt.NewWithClaims(jwt.SigningMethodNone, validClaims(iss, "alg-none-attack"))
-	token.Header["kid"] = testKeyID
+	token := jwt.NewWithClaims(jwt.SigningMethodNone, validClaims("alg-none-attack"))
+	token.Header["kid"] = oidctest.KeyID
 	signed, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
 	if err != nil {
 		t.Fatalf("mint alg=none token: %v", err)
@@ -126,7 +127,7 @@ func TestOIDCValidator_RejectsAlgNone(t *testing.T) {
 
 // Token signed with a wrong key must be rejected by signature verification.
 func TestOIDCValidator_RejectsWrongSignatureKey(t *testing.T) {
-	iss := getSharedIssuer(t)
+	iss := oidctest.Shared(t)
 	v, err := NewValidator(context.Background(), validConfig(iss))
 	if err != nil {
 		t.Fatalf("validator init: %v", err)
@@ -138,8 +139,8 @@ func TestOIDCValidator_RejectsWrongSignatureKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate wrong key: %v", err)
 	}
-	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, validClaims(iss, "wrong-key"))
-	tok.Header["kid"] = testKeyID
+	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, validClaims("wrong-key"))
+	tok.Header["kid"] = oidctest.KeyID
 	signed, err := tok.SignedString(wrongKey)
 	if err != nil {
 		t.Fatalf("sign with wrong key: %v", err)
