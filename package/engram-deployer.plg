@@ -1,35 +1,28 @@
 <?xml version='1.0' standalone='yes'?>
-<!DOCTYPE PLUGIN>
+<!DOCTYPE PLUGIN [
+  <!ENTITY name      "engram-deployer">
+  <!ENTITY author    "Rasbandit">
+  <!ENTITY version   "0.0.0-DEV">
+  <!ENTITY arch      "x86_64">
+  <!ENTITY build     "1">
+  <!ENTITY pkg       "&name;-&version;-&arch;-&build;">
+  <!ENTITY gitURL    "https://github.com/&author;/engram-deployer">
+  <!ENTITY pluginURL "https://raw.githubusercontent.com/&author;/engram-deployer/main/package/engram-deployer.plg">
+  <!ENTITY plugin    "/boot/config/plugins/&name;">
+  <!ENTITY md5       "REPLACE_WITH_PACKAGE_MD5">
+]>
 
-<!--
-  engram-deployer plugin manifest.
-
-  Releases are cut by tagging vX.Y.Z. The release workflow rewrites the
-  three string-substituted fields below before publishing this file
-  as a release asset:
-    - <!ENTITY-style version  via sed on the literal "0.0.0-DEV"
-    - tarball URL via sed on the matching v0.0.0-DEV path
-    - tarball MD5 via sed on the REPLACE_WITH_TARBALL_MD5 sentinel
-
-  NOTE on XML rules:
-    - Comments must not contain a double-hyphen sequence anywhere
-    - Script bodies inside <INLINE> MUST be wrapped in CDATA so shell
-      metacharacters (>, &, etc.) don't break the parser
-    - <FILE> blocks that only download (no script) must NOT carry a
-      Run="" attribute — empty Run is treated as an executable path
--->
 <PLUGIN
-  name="engram-deployer"
-  author="Rasbandit"
-  version="0.0.0-DEV"
-  launch="Settings/EngramDeployer"
-  pluginURL="https://raw.githubusercontent.com/Rasbandit/engram-deployer/main/package/engram-deployer.plg"
+  name="&name;"
+  author="&author;"
+  version="&version;"
+  pluginURL="&pluginURL;"
   min="6.12">
 
 <CHANGES>
 <![CDATA[
 
-### 0.1.x (initial)
+### &version;
 - pull-based deploy daemon for Engram on FastRaid
 - OIDC + JTI + IP allowlist gates on /deploy
 - replaces CI-pushes-via-SSH-as-root pattern
@@ -37,88 +30,22 @@
 ]]>
 </CHANGES>
 
-<!-- 1. Download payload tarball into the plugin's persistent dir. -->
-<FILE Name="/boot/config/plugins/engram-deployer/engram-deployer-0.0.0-DEV.tar.gz">
-<URL>https://github.com/Rasbandit/engram-deployer/releases/download/v0.0.0-DEV/engram-deployer-0.0.0-DEV.tar.gz</URL>
-<MD5>REPLACE_WITH_TARBALL_MD5</MD5>
+<!--
+  Canonical Unraid plugin pattern: Slackware .txz installed via
+  upgradepkg. Slackware tooling extracts to /, normalizes ownership to
+  root:root, runs install/doinst.sh (cert gen + daemon start), and
+  registers files for clean removal via removepkg.
+-->
+<FILE Name="&plugin;/&pkg;.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/releases/download/v&version;/&pkg;.txz</URL>
+<MD5>&md5;</MD5>
 </FILE>
 
-<!-- 2. Extract to root fs. Re-runs each boot because Unraid rebuilds the
-     live filesystem from the boot USB on every restart. -->
-<FILE Run="/bin/bash">
-<INLINE>
-<![CDATA[
-set -e
-echo "Installing engram-deployer 0.0.0-DEV ..."
-tar -xzf /boot/config/plugins/engram-deployer/engram-deployer-0.0.0-DEV.tar.gz -C /
-chmod 0755 /usr/local/sbin/engram-deployer
-chmod 0755 /etc/rc.d/rc.engram-deployer
-]]>
-</INLINE>
-</FILE>
-
-<!-- 3. Generate self-signed TLS cert on first install only. Persists on
-     the boot USB; survives upgrades. CI pins this cert's SHA-256 to
-     detect mid-flight swaps. -->
-<FILE Run="/bin/bash">
-<INLINE>
-<![CDATA[
-set -e
-CERT=/boot/config/plugins/engram-deployer/cert.pem
-KEY=/boot/config/plugins/engram-deployer/key.pem
-if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
-  echo "Generating self-signed TLS cert (10y, ed25519, CN=engram-deployer)..."
-  openssl req -x509 -newkey ed25519 -nodes \
-    -keyout "$KEY" -out "$CERT" \
-    -days 3650 \
-    -subj "/CN=engram-deployer" \
-    -addext "subjectAltName=IP:10.0.20.214" \
-    2>/dev/null
-  chmod 0600 "$KEY"
-  chmod 0644 "$CERT"
-  echo "Cert SHA-256 (pin this in CI):"
-  openssl x509 -in "$CERT" -noout -fingerprint -sha256
-fi
-]]>
-</INLINE>
-</FILE>
-
-<!-- 4. Drop the env-sample only; never overwrite an operator-edited env. -->
-<FILE Run="/bin/bash">
-<INLINE>
-<![CDATA[
-ENV=/boot/config/plugins/engram-deployer/engram-deployer.env
-SAMPLE=/boot/config/plugins/engram-deployer/engram-deployer.env.sample
-if [ ! -f "$ENV" ]; then
-  echo "NOTE: edit $SAMPLE and rename to $ENV before starting the daemon."
-fi
-]]>
-</INLINE>
-</FILE>
-
-<!-- 5. Start the daemon if env file is present. Otherwise leave it
-     stopped so the operator can review config first. -->
-<FILE Run="/bin/bash">
-<INLINE>
-<![CDATA[
-if [ -f /boot/config/plugins/engram-deployer/engram-deployer.env ]; then
-  /etc/rc.d/rc.engram-deployer restart || true
-else
-  echo "engram-deployer NOT started; config file missing."
-fi
-]]>
-</INLINE>
-</FILE>
-
-<!-- Uninstall: stop service, remove binaries, keep plugin dir (preserves
-     cert + env across re-installs). -->
 <FILE Run="/bin/bash" Method="remove">
 <INLINE>
 <![CDATA[
-/etc/rc.d/rc.engram-deployer stop || true
-rm -f /usr/local/sbin/engram-deployer
-rm -f /etc/rc.d/rc.engram-deployer
-echo "engram-deployer removed; cert + env preserved in /boot/config/plugins/engram-deployer/"
+removepkg &pkg; >/dev/null 2>&1 || true
+echo "engram-deployer removed; cert + env preserved in &plugin;/"
 ]]>
 </INLINE>
 </FILE>

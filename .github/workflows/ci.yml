@@ -38,9 +38,27 @@ jobs:
 
       - name: Validate plugin manifest XML
         run: |
-          # XML comments may not contain '--'. Easy to introduce by accident
-          # in a code-example block, breaks Unraid's plugin parser silently.
+          # XML comments may not contain '--'. Easy to introduce by
+          # accident in a code-example block, breaks Unraid's plugin
+          # parser silently.
           xmllint --noout package/engram-deployer.plg
 
-      - name: Build tarball (smoke)
-        run: bash package/build-tarball.sh 0.0.0-ci
+      - name: Build Slackware .txz (smoke)
+        run: bash package/build-package.sh 0.0.0-ci
+
+      - name: Assert package entries are uid=0/gid=0
+        # Belt to the build-package.sh --owner=0 suspenders. installpkg
+        # normalizes ownership during extraction, but a tarball stamped
+        # with the build runner's UID would chown `/` itself if anyone
+        # ever bypassed installpkg with raw `tar -xJf -C /` (which is
+        # exactly how the v0.1.2 install bug happened).
+        run: |
+          tar -tvJf dist/engram-deployer-0.0.0-ci-x86_64-1.txz | \
+            awk '$2 != "0/0" { print "BAD:", $0; bad++ } END { if (bad>0) { print bad" entries not owned by 0/0"; exit 1 } }'
+
+      - name: Assert package contains Slackware metadata
+        run: |
+          tar -tJf dist/engram-deployer-0.0.0-ci-x86_64-1.txz | \
+            grep -qE '^\./install/slack-desc$' || { echo "missing install/slack-desc"; exit 1; }
+          tar -tJf dist/engram-deployer-0.0.0-ci-x86_64-1.txz | \
+            grep -qE '^\./install/doinst.sh$' || { echo "missing install/doinst.sh"; exit 1; }

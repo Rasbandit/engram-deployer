@@ -6,12 +6,11 @@
 
    Unraid web UI → **Plugins** → **Install Plugin** → paste the raw URL of `engram-deployer.plg` from the GitHub release.
 
-   The install hook:
-   - Downloads the binary tarball into `/boot/config/plugins/engram-deployer/`
-   - Extracts to `/usr/local/sbin/engram-deployer` + `/etc/rc.d/rc.engram-deployer`
-   - Generates a self-signed ed25519 TLS cert (`cert.pem` + `key.pem`) — **valid 10 years**
-   - Drops `engram-deployer.env.sample`
-   - Does NOT start the daemon (waiting for config)
+   The plugin is a Slackware `.txz`. Unraid runs `upgradepkg --install-new`, which:
+   - Extracts the package to `/` with root:root ownership
+   - Installs `/usr/local/sbin/engram-deployer` + `/etc/rc.d/rc.engram-deployer`
+   - Drops `engram-deployer.env.sample` into `/boot/config/plugins/engram-deployer/`
+   - Runs `install/doinst.sh`: generates a self-signed ed25519 TLS cert (`cert.pem` + `key.pem`, **valid 10 years**) and starts the daemon if `engram-deployer.env` already exists (otherwise leaves it stopped for config)
 
 2. **Capture the cert SHA-256** — printed by the install hook. Pin this in CI:
 
@@ -58,11 +57,11 @@ Reload: `bash /boot/config/iptables.runner.sh`.
 
 ## Upgrades
 
-Bump `<ENTITY version>` in `engram-deployer.plg`, build new tarball, push tag. Unraid UI shows "update available"; click → new tarball extracted, daemon restarted. Cert + env preserved across upgrades.
+Push a new `v*.*.*` tag. The release workflow builds the `.txz` and materializes the `.plg` with the version + MD5 baked in. Unraid UI shows "update available"; click → `upgradepkg --install-new` swaps in the new package, `doinst.sh` restarts the daemon. Cert + env preserved across upgrades.
 
 ## Uninstall
 
-Plugins → engram-deployer → **Remove**. Cert and env stay in `/boot/config/plugins/engram-deployer/` so a re-install picks them up.
+Plugins → engram-deployer → **Remove**. The remove hook calls `removepkg` (clean Slackware uninstall — every file from the install manifest, no more, no less). Cert and env stay in `/boot/config/plugins/engram-deployer/` so a re-install picks them up.
 
 ## Troubleshooting
 
