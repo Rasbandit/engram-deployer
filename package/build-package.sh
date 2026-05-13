@@ -54,7 +54,15 @@ mkdir -p "$(dirname "$OUT")"
 # during extraction, but a tarball with non-root entries trips audit/CI and
 # would chown `/` itself if anyone ever bypassed installpkg with a raw
 # `tar -xJf -C /` (which is exactly how the v0.1.2 install bug happened).
-tar --owner=0 --group=0 --numeric-owner -cJf "$OUT" -C "$STAGE" .
+#
+# Archive paths must NOT carry the leading `./` that `tar -C dir .` emits.
+# installpkg detects metadata via:
+#   tar --transform "s,^install$,..," --transform "s,^install/,..,"
+# Those anchors don't match `./install/...`, so any leading-dot prefix
+# breaks doinst.sh execution and slack-desc parsing (cost us v0.1.3).
+# Pack top-level dirs explicitly to keep paths anchored at the package root.
+( cd "$STAGE" && tar --owner=0 --group=0 --numeric-owner -cJf "$OUT" \
+    usr etc boot install )
 
 MD5="$(md5sum "$OUT" | awk '{print $1}')"
 SIZE="$(stat -c %s "$OUT")"

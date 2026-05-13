@@ -56,9 +56,16 @@ jobs:
           tar -tvJf dist/engram-deployer-0.0.0-ci-x86_64-1.txz | \
             awk '$2 != "0/0" { print "BAD:", $0; bad++ } END { if (bad>0) { print bad" entries not owned by 0/0"; exit 1 } }'
 
-      - name: Assert package contains Slackware metadata
+      - name: Assert package contains Slackware metadata at anchored paths
+        # installpkg detects metadata via `tar --transform 's,^install/,..,'`
+        # — that anchor doesn't match `./install/...`. A leading `./` on
+        # ANY entry means doinst.sh never runs and slack-desc is never
+        # parsed (cost us v0.1.3). Assert both shape (anchored, no `./`)
+        # and presence (the two metadata files exist).
         run: |
           tar -tJf dist/engram-deployer-0.0.0-ci-x86_64-1.txz | \
-            grep -qE '^\./install/slack-desc$' || { echo "missing install/slack-desc"; exit 1; }
+            awk '/^\.\// { bad++ } END { if (bad>0) { print bad" entries have ./ prefix — installpkg will not detect install/ metadata"; exit 1 } }'
           tar -tJf dist/engram-deployer-0.0.0-ci-x86_64-1.txz | \
-            grep -qE '^\./install/doinst.sh$' || { echo "missing install/doinst.sh"; exit 1; }
+            grep -qE '^install/slack-desc$' || { echo "missing install/slack-desc (must be anchored, no leading ./)"; exit 1; }
+          tar -tJf dist/engram-deployer-0.0.0-ci-x86_64-1.txz | \
+            grep -qE '^install/doinst.sh$' || { echo "missing install/doinst.sh (must be anchored, no leading ./)"; exit 1; }
