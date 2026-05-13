@@ -50,6 +50,12 @@ jobs:
             exit 1
           fi
 
+          # Validate XML — Unraid's plugin parser is strict (and silent on
+          # failure). xmllint catches XML rule violations like double-hyphen
+          # in comments BEFORE we publish.
+          sudo apt-get install -y -qq libxml2-utils
+          xmllint --noout "${PLG_OUT}"
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

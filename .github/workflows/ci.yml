@@ -32,3 +32,15 @@ jobs:
 
       - name: go test (-race)
         run: go test -race -timeout 60s ./...
+
+      - name: Install xmllint
+        run: sudo apt-get install -y libxml2-utils
+
+      - name: Validate plugin manifest XML
+        run: |
+          # XML comments may not contain '--'. Easy to introduce by accident
+          # in a code-example block, breaks Unraid's plugin parser silently.
+          xmllint --noout package/engram-deployer.plg
+
+      - name: Build tarball (smoke)
+        run: bash package/build-tarball.sh 0.0.0-ci
