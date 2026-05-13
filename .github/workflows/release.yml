@@ -18,43 +18,41 @@ jobs:
           go-version: '1.25'
           cache: true
 
-      - name: Build payload tarball
+      - name: Build Slackware .txz
         id: build
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          bash package/build-tarball.sh "${VERSION}"
-          TARBALL="dist/engram-deployer-${VERSION}.tar.gz"
-          MD5=$(md5sum "$TARBALL" | awk '{print $1}')
+          bash package/build-package.sh "${VERSION}"
+          PKG="dist/engram-deployer-${VERSION}-x86_64-1.txz"
+          MD5=$(md5sum "$PKG" | awk '{print $1}')
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
+          echo "pkg=${PKG}" >> "$GITHUB_OUTPUT"
           echo "md5=${MD5}" >> "$GITHUB_OUTPUT"
 
-      - name: Materialize .plg with concrete version + MD5 + URL
+      - name: Materialize .plg with concrete version + MD5
         env:
           VERSION: ${{ steps.build.outputs.version }}
           MD5: ${{ steps.build.outputs.md5 }}
         run: |
           set -e
           PLG_OUT="dist/engram-deployer.plg"
-          TARURL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/engram-deployer-${VERSION}.tar.gz"
 
-          # Substitutions are anchored on literal sentinel strings that only
-          # appear in the manifest's substitution points (never in comments
-          # or shell bodies), so a single global sed pass is safe.
+          # Substitutions are anchored on literal sentinel strings that
+          # only appear in the manifest's substitution points (never in
+          # comments or shell bodies), so a single global sed pass is safe.
           sed \
-            -e "s|REPLACE_WITH_TARBALL_MD5|${MD5}|g" \
+            -e "s|REPLACE_WITH_PACKAGE_MD5|${MD5}|g" \
             -e "s|0\\.0\\.0-DEV|${VERSION}|g" \
             package/engram-deployer.plg > "${PLG_OUT}"
 
-          # Sanity: no placeholders left.
           if grep -q "REPLACE_WITH_" "${PLG_OUT}"; then
             echo "::error::placeholder still present in materialized .plg" >&2
             exit 1
           fi
 
-          # Validate XML — Unraid's plugin parser is strict (and silent on
-          # failure). xmllint catches XML rule violations like double-hyphen
-          # in comments BEFORE we publish.
+          # Unraid's plugin parser is strict (and silent on failure).
+          # xmllint catches XML rule violations like double-hyphen in
+          # comments BEFORE we publish.
           sudo apt-get install -y -qq libxml2-utils
           xmllint --noout "${PLG_OUT}"
 
@@ -65,5 +63,5 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
             --notes "engram-deployer ${GITHUB_REF_NAME}. Install via Unraid → Plugins → Install Plugin with the .plg asset URL." \
-            "${{ steps.build.outputs.tarball }}" \
+            "${{ steps.build.outputs.pkg }}" \
             "dist/engram-deployer.plg"
