@@ -1,0 +1,124 @@
+<?xml version="1.0" standalone="yes"?>
+<!--
+  engram-deployer — pull-based deploy daemon for Engram on FastRaid.
+
+  Install:
+    Unraid → Plugins → Install Plugin → paste this file's raw URL.
+
+  After install, edit /boot/config/plugins/engram-deployer/engram-deployer.env
+  (copy from engram-deployer.env.sample) then:
+    /etc/rc.d/rc.engram-deployer start
+
+  See https://github.com/Rasbandit/engram-deployer for the full picture.
+
+  When cutting a release:
+    1. Run `bash package/build-tarball.sh <version>` locally to capture MD5.
+    2. Bump <ENTITY version> to today's date (YYYY.MM.DD).
+    3. Update <ENTITY tarurl> to the v<version> release asset URL.
+    4. Paste the new MD5 into <ENTITY md5>.
+    5. Tag + push: `git tag v<version> && git push --tags` (CI publishes
+       the release + assets).
+-->
+<!DOCTYPE PLUGIN [
+  <!ENTITY name      "engram-deployer">
+  <!ENTITY author    "Rasbandit">
+  <!ENTITY version   "0.1.0">
+  <!ENTITY md5       "REPLACE_WITH_TARBALL_MD5">
+  <!ENTITY launch    "Settings/EngramDeployer">
+  <!ENTITY pluginURL "https://raw.githubusercontent.com/Rasbandit/engram-deployer/main/package/engram-deployer.plg">
+  <!ENTITY tarurl    "https://github.com/Rasbandit/engram-deployer/releases/download/v0.1.0/engram-deployer-0.1.0.tar.gz">
+  <!ENTITY plugindir "/boot/config/plugins/&name;">
+]>
+<PLUGIN name="&name;"
+        author="&author;"
+        version="&version;"
+        launch="&launch;"
+        pluginURL="&pluginURL;"
+        min="6.12">
+
+  <CHANGES>
+###0.1.0 (initial)
+- pull-based deploy daemon for Engram on FastRaid
+- OIDC + JTI + IP allowlist gates on /deploy
+- replaces CI-pushes-via-SSH-as-root pattern
+  </CHANGES>
+
+  <!-- 1. Download payload tarball into the plugin's persistent dir. -->
+  <FILE Name="&plugindir;/&name;-&version;.tar.gz" Run="">
+    <URL>&tarurl;</URL>
+    <MD5>&md5;</MD5>
+  </FILE>
+
+  <!-- 2. Extract to root fs. Each boot the live fs is rebuilt; this hook
+       runs again so the binary + rc.d script reappear at /usr/local/sbin
+       and /etc/rc.d. -->
+  <FILE Run="/bin/bash">
+    <INLINE>
+      set -e
+      echo "Installing engram-deployer &version; ..."
+      tar -xzf &plugindir;/&name;-&version;.tar.gz -C /
+      chmod 0755 /usr/local/sbin/engram-deployer
+      chmod 0755 /etc/rc.d/rc.engram-deployer
+    </INLINE>
+  </FILE>
+
+  <!-- 3. Generate self-signed TLS cert on first install only. Persists on
+       the boot USB; survives upgrades. CI must pin this cert's SHA-256
+       to detect mid-flight swaps. -->
+  <FILE Run="/bin/bash">
+    <INLINE>
+      set -e
+      CERT=&plugindir;/cert.pem
+      KEY=&plugindir;/key.pem
+      if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
+        echo "Generating self-signed TLS cert (10y, ed25519, CN=engram-deployer)..."
+        openssl req -x509 -newkey ed25519 -nodes \
+          -keyout "$KEY" -out "$CERT" \
+          -days 3650 \
+          -subj "/CN=engram-deployer" \
+          -addext "subjectAltName=IP:10.0.20.214" \
+          2>/dev/null
+        chmod 0600 "$KEY"
+        chmod 0644 "$CERT"
+        echo "Cert SHA-256 (pin this in CI):"
+        openssl x509 -in "$CERT" -noout -fingerprint -sha256
+      fi
+    </INLINE>
+  </FILE>
+
+  <!-- 4. Drop the env-sample if no env file exists yet. Do NOT overwrite
+       an operator-edited one. -->
+  <FILE Run="/bin/bash">
+    <INLINE>
+      ENV=&plugindir;/engram-deployer.env
+      SAMPLE=&plugindir;/engram-deployer.env.sample
+      if [ ! -f "$ENV" ]; then
+        echo "NOTE: edit $SAMPLE and rename to $ENV before starting the daemon."
+      fi
+    </INLINE>
+  </FILE>
+
+  <!-- 5. Start the daemon if env file is present. Otherwise leave it stopped
+       so the operator can review config first. -->
+  <FILE Run="/bin/bash">
+    <INLINE>
+      if [ -f &plugindir;/engram-deployer.env ]; then
+        /etc/rc.d/rc.engram-deployer restart || true
+      else
+        echo "engram-deployer NOT started — config file missing."
+      fi
+    </INLINE>
+  </FILE>
+
+  <!-- Uninstall: stop service, remove binaries, keep plugin dir
+       (preserves cert + env across re-installs). -->
+  <FILE Run="/bin/bash" Method="remove">
+    <INLINE>
+      /etc/rc.d/rc.engram-deployer stop || true
+      rm -f /usr/local/sbin/engram-deployer
+      rm -f /etc/rc.d/rc.engram-deployer
+      echo "engram-deployer removed; cert + env preserved in &plugindir;/"
+    </INLINE>
+  </FILE>
+
+</PLUGIN>
