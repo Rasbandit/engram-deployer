@@ -1,0 +1,27 @@
+# Binaries
+/engram-deployer
+/dist/
+*.exe
+*.out
+
+# Go build cache + test artifacts
+/.cache/
+*.test
+coverage.out
+coverage.html
+
+# Local TLS material — never commit
+*.pem
+*.key
+*.crt
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Plugin build artifacts
+*.tar.gz
+*.txz
