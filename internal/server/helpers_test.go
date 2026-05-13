@@ -1,0 +1,107 @@
+package server
+
+import (
+	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/Rasbandit/engram-deployer/internal/auth"
+	"github.com/Rasbandit/engram-deployer/internal/oidctest"
+	"github.com/golang-jwt/jwt/v5"
+)
+
+// fakeDeployer captures Run invocations and emits a scripted sequence
+// of events, optionally followed by an error.
+type fakeDeployer struct {
+	mu         sync.Mutex
+	calledWith string
+	scriptEvts []DeployEvent
+	scriptErr  error
+}
+
+func (f *fakeDeployer) Run(_ context.Context, version string, events chan<- DeployEvent) error {
+	f.mu.Lock()
+	f.calledWith = version
+	evs := append([]DeployEvent(nil), f.scriptEvts...)
+	err := f.scriptErr
+	f.mu.Unlock()
+
+	for _, e := range evs {
+		events <- e
+	}
+	close(events)
+	return err
+}
+
+func (f *fakeDeployer) CalledWith() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calledWith
+}
+
+// testServerOpts is configured via the functional opts passed to newTestServer.
+type testServerOpts struct {
+	deployer Deployer
+}
+
+func withDeployer(d Deployer) func(*testServerOpts) {
+	return func(o *testServerOpts) { o.deployer = d }
+}
+
+// newTestServer constructs a Server wired to the in-process OIDC test issuer
+// (oidctest.Shared) and a fake Deployer. Caller can override the deployer
+// with withDeployer.
+func newTestServer(t *testing.T, opts ...func(*testServerOpts)) *Server {
+	t.Helper()
+
+	o := &testServerOpts{deployer: &fakeDeployer{}}
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	iss := oidctest.Shared(t)
+	validator, err := auth.NewValidator(context.Background(), auth.OIDCConfig{
+		JWKSURL:     iss.JWKSURL(),
+		Issuer:      "https://token.actions.githubusercontent.com",
+		Audience:    "engram-deploy",
+		Repository:  "Rasbandit/Engram",
+		Ref:         "refs/heads/main",
+		WorkflowRef: "Rasbandit/Engram/.github/workflows/ci.yml@refs/heads/main",
+	})
+	if err != nil {
+		t.Fatalf("validator init: %v", err)
+	}
+
+	ipAllow, err := auth.NewIPAllowlist([]string{"127.0.0.1"})
+	if err != nil {
+		t.Fatalf("ip allowlist init: %v", err)
+	}
+
+	return New(Config{
+		Validator: validator,
+		JTI:       auth.NewJTISet(100, 30*time.Minute),
+		IPAllow:   ipAllow,
+		Deployer:  o.deployer,
+	})
+}
+
+// mintValidToken returns a freshly-signed OIDC token whose claims pass
+// every validator gate. Use a unique jti per test run to avoid replay
+// collisions across calls that share an issuer.
+func mintValidToken(t *testing.T, jti string) string {
+	t.Helper()
+	iss := oidctest.Shared(t)
+	now := time.Now()
+	return iss.Mint(t, jwt.MapClaims{
+		"iss":          "https://token.actions.githubusercontent.com",
+		"aud":          "engram-deploy",
+		"iat":          now.Unix(),
+		"nbf":          now.Unix(),
+		"exp":          now.Add(15 * time.Minute).Unix(),
+		"jti":          jti,
+		"repository":   "Rasbandit/Engram",
+		"ref":          "refs/heads/main",
+		"workflow_ref": "Rasbandit/Engram/.github/workflows/ci.yml@refs/heads/main",
+	})
+}
