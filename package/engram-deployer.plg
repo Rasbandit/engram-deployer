@@ -11,13 +11,13 @@
 
   See https://github.com/Rasbandit/engram-deployer for the full picture.
 
-  When cutting a release:
-    1. Run `bash package/build-tarball.sh <version>` locally to capture MD5.
-    2. Bump <ENTITY version> to today's date (YYYY.MM.DD).
-    3. Update <ENTITY tarurl> to the v<version> release asset URL.
-    4. Paste the new MD5 into <ENTITY md5>.
-    5. Tag + push: `git tag v<version> && git push --tags` (CI publishes
-       the release + assets).
+  Releases are cut by tagging vX.Y.Z and letting .github/workflows/release.yml
+  materialize this file with concrete version + tarball URL + MD5 before
+  attaching it to the GitHub release.
+
+  NOTE: XML comments may not contain a double-hyphen sequence anywhere in
+  the body — including command-line examples. Be careful editing this
+  block.
 -->
 <!DOCTYPE PLUGIN [
   <!ENTITY name      "engram-deployer">
