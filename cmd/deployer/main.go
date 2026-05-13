@@ -2,14 +2,11 @@
 // FastRaid. See README.md and internal/server/doc.go for the full picture.
 //
 // Config is loaded from environment variables (set by the Unraid plugin's
-// rc.d wrapper). Real Deployer wiring lives in internal/deploy and is
-// composed in Step 4 — for now this builds and exits with "deployer not
-// configured" so the package compiles end-to-end.
+// rc.d wrapper).
 package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -19,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Rasbandit/engram-deployer/internal/auth"
+	"github.com/Rasbandit/engram-deployer/internal/deploy"
 	"github.com/Rasbandit/engram-deployer/internal/server"
 )
 
@@ -33,6 +31,13 @@ type config struct {
 	Ref         string
 	WorkflowRef string
 	AllowedIPs  []string
+
+	Image               string
+	TemplateDir         string
+	DockerPath          string
+	UpdateContainerPath string
+	HealthPollInterval  time.Duration
+	HealthMaxWait       time.Duration
 }
 
 func loadConfig() (config, error) {
@@ -47,6 +52,13 @@ func loadConfig() (config, error) {
 		Ref:         envOr("DEPLOYER_REF", "refs/heads/main"),
 		WorkflowRef: os.Getenv("DEPLOYER_WORKFLOW_REF"),
 		AllowedIPs:  splitCSV(os.Getenv("DEPLOYER_ALLOWED_IPS")),
+
+		Image:               envOr("DEPLOYER_IMAGE", "ghcr.io/rasbandit/engram"),
+		TemplateDir:         envOr("DEPLOYER_TEMPLATE_DIR", "/boot/config/plugins/dockerMan/templates-user"),
+		DockerPath:          envOr("DEPLOYER_DOCKER_PATH", "docker"),
+		UpdateContainerPath: envOr("DEPLOYER_UPDATE_CONTAINER_PATH", deploy.DefaultUpdateContainerPath),
+		HealthPollInterval:  envDuration("DEPLOYER_HEALTH_POLL_INTERVAL", 2*time.Second),
+		HealthMaxWait:       envDuration("DEPLOYER_HEALTH_MAX_WAIT", 60*time.Second),
 	}
 	var missing []string
 	if cfg.CertFile == "" {
@@ -73,6 +85,15 @@ func loadConfig() (config, error) {
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	if v := os.Getenv(key); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
 	}
 	return fallback
 }
@@ -118,24 +139,29 @@ func main() {
 		log.Fatalf("init IP allowlist: %v", err)
 	}
 
+	orch := &deploy.Orchestrator{
+		Image:       cfg.Image,
+		TemplateDir: cfg.TemplateDir,
+		// Order matters — SaaS first so a broken image fails fast on the
+		// lower-traffic side without touching production-facing selfhost.
+		Containers: []deploy.ContainerSpec{
+			{Name: "engram-saas", Port: 8000},
+			{Name: "engram-selfhost", Port: 8001},
+		},
+		Puller:  &deploy.Docker{Path: cfg.DockerPath},
+		Updater: deploy.NewUpdateContainer(cfg.UpdateContainerPath),
+		Health:  deploy.NewHealthChecker(cfg.HealthPollInterval, cfg.HealthMaxWait),
+	}
+
 	srv := server.New(server.Config{
 		Validator: validator,
 		JTI:       auth.NewJTISet(1000, 30*time.Minute),
 		IPAllow:   ipAllow,
-		Deployer:  notWiredDeployer{},
+		Deployer:  orch,
 	})
 
-	log.Printf("engram-deployer listening on %s (Step 4 will wire real Deployer)", cfg.Addr)
+	log.Printf("engram-deployer listening on %s", cfg.Addr)
 	if err := srv.ListenAndServeTLS(ctx, cfg.Addr, cfg.CertFile, cfg.KeyFile); err != nil {
 		log.Fatalf("server: %v", err)
 	}
-}
-
-// notWiredDeployer is a placeholder until Step 4 lands the real impl.
-// Any /deploy request fails with a clear "not configured" message.
-type notWiredDeployer struct{}
-
-func (notWiredDeployer) Run(_ context.Context, _ string, events chan<- server.DeployEvent) error {
-	close(events)
-	return errors.New("deploy logic not yet wired (Step 4 pending)")
 }
