@@ -1,0 +1,61 @@
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Build payload tarball
+        id: build
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          bash package/build-tarball.sh "${VERSION}"
+          TARBALL="dist/engram-deployer-${VERSION}.tar.gz"
+          MD5=$(md5sum "$TARBALL" | awk '{print $1}')
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
+          echo "md5=${MD5}" >> "$GITHUB_OUTPUT"
+
+      - name: Materialize .plg with concrete version + MD5 + URL
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+          MD5: ${{ steps.build.outputs.md5 }}
+        run: |
+          set -e
+          PLG_OUT="dist/engram-deployer.plg"
+          TARURL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/engram-deployer-${VERSION}.tar.gz"
+
+          sed \
+            -e "s|REPLACE_WITH_TARBALL_MD5|${MD5}|g" \
+            -e "s|<!ENTITY version   \"[^\"]*\">|<!ENTITY version   \"${VERSION}\">|" \
+            -e "s|<!ENTITY tarurl    \"[^\"]*\">|<!ENTITY tarurl    \"${TARURL}\">|" \
+            package/engram-deployer.plg > "${PLG_OUT}"
+
+          # Sanity: no placeholders left.
+          if grep -q "REPLACE_WITH_" "${PLG_OUT}"; then
+            echo "::error::placeholder still present in materialized .plg" >&2
+            exit 1
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "engram-deployer ${GITHUB_REF_NAME}. Install via Unraid → Plugins → Install Plugin with the .plg asset URL." \
+            "${{ steps.build.outputs.tarball }}" \
+            "dist/engram-deployer.plg"

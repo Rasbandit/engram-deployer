@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# rc.engram-deployer — Slackware-style init for the engram-deployer daemon.
+#
+# Installed by the Unraid plugin to /etc/rc.d/. Sources environment from
+# /boot/config/plugins/engram-deployer/engram-deployer.env (persistent on
+# the boot USB). The binary lives at /usr/local/sbin/engram-deployer.
+#
+# Usage: /etc/rc.d/rc.engram-deployer {start|stop|restart|status}
+
+PLUGIN_DIR="/boot/config/plugins/engram-deployer"
+BIN="/usr/local/sbin/engram-deployer"
+PIDFILE="/var/run/engram-deployer.pid"
+LOGFILE="/var/log/engram-deployer.log"
+ENVFILE="${PLUGIN_DIR}/engram-deployer.env"
+
+start() {
+  if status >/dev/null; then
+    echo "engram-deployer already running (pid $(cat $PIDFILE))"
+    return 0
+  fi
+  if [ ! -x "$BIN" ]; then
+    echo "engram-deployer binary missing: $BIN" >&2
+    return 1
+  fi
+  if [ ! -f "$ENVFILE" ]; then
+    echo "config missing: $ENVFILE (copy + edit engram-deployer.env.sample)" >&2
+    return 1
+  fi
+
+  # Source env into this subshell, exec daemon detached.
+  ( set -a; . "$ENVFILE"; set +a
+    nohup "$BIN" >>"$LOGFILE" 2>&1 &
+    echo $! > "$PIDFILE"
+  )
+  sleep 1
+  if status >/dev/null; then
+    echo "engram-deployer started (pid $(cat $PIDFILE))"
+  else
+    echo "engram-deployer failed to start; see $LOGFILE" >&2
+    return 1
+  fi
+}
+
+stop() {
+  if ! status >/dev/null; then
+    echo "engram-deployer not running"
+    rm -f "$PIDFILE"
+    return 0
+  fi
+  pid=$(cat "$PIDFILE")
+  kill "$pid" 2>/dev/null
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      rm -f "$PIDFILE"
+      echo "engram-deployer stopped"
+      return 0
+    fi
+    sleep 1
+  done
+  kill -9 "$pid" 2>/dev/null
+  rm -f "$PIDFILE"
+  echo "engram-deployer force-killed after 10s"
+}
+
+status() {
+  if [ ! -f "$PIDFILE" ]; then
+    return 1
+  fi
+  pid=$(cat "$PIDFILE")
+  if kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
+case "$1" in
+  start)   start ;;
+  stop)    stop ;;
+  restart) stop; start ;;
+  status)
+    if status; then
+      echo "engram-deployer running (pid $(cat $PIDFILE))"
+    else
+      echo "engram-deployer not running"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|status}" >&2
+    exit 2
+    ;;
+esac
