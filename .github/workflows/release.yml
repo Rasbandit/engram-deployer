@@ -38,10 +38,12 @@ jobs:
           PLG_OUT="dist/engram-deployer.plg"
           TARURL="https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/engram-deployer-${VERSION}.tar.gz"
 
+          # Substitutions are anchored on literal sentinel strings that only
+          # appear in the manifest's substitution points (never in comments
+          # or shell bodies), so a single global sed pass is safe.
           sed \
             -e "s|REPLACE_WITH_TARBALL_MD5|${MD5}|g" \
-            -e "s|<!ENTITY version   \"[^\"]*\">|<!ENTITY version   \"${VERSION}\">|" \
-            -e "s|<!ENTITY tarurl    \"[^\"]*\">|<!ENTITY tarurl    \"${TARURL}\">|" \
+            -e "s|0\\.0\\.0-DEV|${VERSION}|g" \
             package/engram-deployer.plg > "${PLG_OUT}"
 
           # Sanity: no placeholders left.
