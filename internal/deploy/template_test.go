@@ -8,19 +8,19 @@ import (
 const sampleTemplate = `<?xml version="1.0"?>
 <Container version="2">
   <Name>engram-saas</Name>
-  <Repository>ghcr.io/rasbandit/engram:0.5.60</Repository>
+  <Repository>ghcr.io/engram-app/engram:0.5.60</Repository>
   <Registry>https://ghcr.io/</Registry>
   <Network>bridge</Network>
 </Container>
 `
 
 func TestReplaceRepoTag_ReplacesAndPreservesRest(t *testing.T) {
-	got, err := ReplaceRepoTag([]byte(sampleTemplate), "ghcr.io/rasbandit/engram", "0.5.61")
+	got, err := ReplaceRepoTag([]byte(sampleTemplate), "ghcr.io/engram-app/engram", "0.5.61")
 	if err != nil {
 		t.Fatalf("ReplaceRepoTag: %v", err)
 	}
 
-	if !strings.Contains(string(got), "<Repository>ghcr.io/rasbandit/engram:0.5.61</Repository>") {
+	if !strings.Contains(string(got), "<Repository>ghcr.io/engram-app/engram:0.5.61</Repository>") {
 		t.Errorf("repository tag not updated; got:\n%s", got)
 	}
 	if strings.Contains(string(got), "0.5.60") {
@@ -39,11 +39,11 @@ func TestReplaceRepoTag_ReplacesAndPreservesRest(t *testing.T) {
 }
 
 func TestReplaceRepoTag_Idempotent(t *testing.T) {
-	once, err := ReplaceRepoTag([]byte(sampleTemplate), "ghcr.io/rasbandit/engram", "0.5.61")
+	once, err := ReplaceRepoTag([]byte(sampleTemplate), "ghcr.io/engram-app/engram", "0.5.61")
 	if err != nil {
 		t.Fatal(err)
 	}
-	twice, err := ReplaceRepoTag(once, "ghcr.io/rasbandit/engram", "0.5.61")
+	twice, err := ReplaceRepoTag(once, "ghcr.io/engram-app/engram", "0.5.61")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestReplaceRepoTag_Idempotent(t *testing.T) {
 
 func TestReplaceRepoTag_FailsIfNoRepositoryTag(t *testing.T) {
 	bogus := []byte(`<?xml version="1.0"?><Container><Name>x</Name></Container>`)
-	if _, err := ReplaceRepoTag(bogus, "ghcr.io/rasbandit/engram", "0.5.61"); err == nil {
+	if _, err := ReplaceRepoTag(bogus, "ghcr.io/engram-app/engram", "0.5.61"); err == nil {
 		t.Fatal("expected error when <Repository> tag missing")
 	}
 }
@@ -64,10 +64,10 @@ func TestReplaceRepoTag_FailsIfRepositoryDoesntMatchImage(t *testing.T) {
 	// by mistake). Refuse loudly rather than silently fail to match.
 	mismatched := strings.ReplaceAll(
 		sampleTemplate,
-		"ghcr.io/rasbandit/engram:0.5.60",
+		"ghcr.io/engram-app/engram:0.5.60",
 		"ghcr.io/some-other/image:1.0.0",
 	)
-	if _, err := ReplaceRepoTag([]byte(mismatched), "ghcr.io/rasbandit/engram", "0.5.61"); err == nil {
+	if _, err := ReplaceRepoTag([]byte(mismatched), "ghcr.io/engram-app/engram", "0.5.61"); err == nil {
 		t.Fatal("expected error when <Repository> doesn't reference the target image")
 	}
 }

@@ -24,14 +24,14 @@ func fakeDockerCLI(t *testing.T, body string) string {
 func TestDocker_Pull_PassesImageRefAndStreamsProgress(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "args.log")
 	cli := fakeDockerCLI(t, `echo "$@" > `+logPath+`
-echo "Pulling from rasbandit/engram"
+echo "Pulling from engram-app/engram"
 echo "Status: Downloaded newer image"
 exit 0
 `)
 
 	d := &Docker{Path: cli}
 	var progress bytes.Buffer
-	if err := d.Pull(context.Background(), "ghcr.io/rasbandit/engram", "0.5.61", &progress); err != nil {
+	if err := d.Pull(context.Background(), "ghcr.io/engram-app/engram", "0.5.61", &progress); err != nil {
 		t.Fatalf("Pull: %v", err)
 	}
 
@@ -39,10 +39,10 @@ exit 0
 	if err != nil {
 		t.Fatalf("read args: %v", err)
 	}
-	if got := strings.TrimSpace(string(args)); got != "pull ghcr.io/rasbandit/engram:0.5.61" {
-		t.Errorf("fake docker received %q, want %q", got, "pull ghcr.io/rasbandit/engram:0.5.61")
+	if got := strings.TrimSpace(string(args)); got != "pull ghcr.io/engram-app/engram:0.5.61" {
+		t.Errorf("fake docker received %q, want %q", got, "pull ghcr.io/engram-app/engram:0.5.61")
 	}
-	if !strings.Contains(progress.String(), "Pulling from rasbandit/engram") {
+	if !strings.Contains(progress.String(), "Pulling from engram-app/engram") {
 		t.Errorf("progress did not include Pull output:\n%s", progress.String())
 	}
 }

@@ -15,9 +15,9 @@ type OIDCConfig struct {
 	JWKSURL     string // GitHub's: https://token.actions.githubusercontent.com/.well-known/jwks
 	Issuer      string // https://token.actions.githubusercontent.com
 	Audience    string // engram-deploy
-	Repository  string // e.g. Rasbandit/Engram
+	Repository  string // e.g. engram-app/Engram
 	Ref         string // e.g. refs/heads/main
-	WorkflowRef string // e.g. Rasbandit/Engram/.github/workflows/ci.yml@refs/heads/main
+	WorkflowRef string // e.g. engram-app/Engram/.github/workflows/ci.yml@refs/heads/main
 }
 
 // Claims is the subset of GitHub Actions OIDC claims callers need

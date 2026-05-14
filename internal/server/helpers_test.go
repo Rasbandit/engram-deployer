@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Rasbandit/engram-deployer/internal/auth"
-	"github.com/Rasbandit/engram-deployer/internal/oidctest"
+	"github.com/engram-app/engram-deployer/internal/auth"
+	"github.com/engram-app/engram-deployer/internal/oidctest"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -65,9 +65,9 @@ func newTestServer(t *testing.T, opts ...func(*testServerOpts)) *Server {
 		JWKSURL:     iss.JWKSURL(),
 		Issuer:      "https://token.actions.githubusercontent.com",
 		Audience:    "engram-deploy",
-		Repository:  "Rasbandit/Engram",
+		Repository:  "engram-app/Engram",
 		Ref:         "refs/heads/main",
-		WorkflowRef: "Rasbandit/Engram/.github/workflows/ci.yml@refs/heads/main",
+		WorkflowRef: "engram-app/Engram/.github/workflows/ci.yml@refs/heads/main",
 	})
 	if err != nil {
 		t.Fatalf("validator init: %v", err)
@@ -100,8 +100,8 @@ func mintValidToken(t *testing.T, jti string) string {
 		"nbf":          now.Unix(),
 		"exp":          now.Add(15 * time.Minute).Unix(),
 		"jti":          jti,
-		"repository":   "Rasbandit/Engram",
+		"repository":   "engram-app/Engram",
 		"ref":          "refs/heads/main",
-		"workflow_ref": "Rasbandit/Engram/.github/workflows/ci.yml@refs/heads/main",
+		"workflow_ref": "engram-app/Engram/.github/workflows/ci.yml@refs/heads/main",
 	})
 }

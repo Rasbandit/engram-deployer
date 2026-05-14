@@ -3,7 +3,7 @@
 //
 // Sequence per deploy:
 //
-//  1. docker pull ghcr.io/rasbandit/engram:<version>
+//  1. docker pull ghcr.io/engram-app/engram:<version>
 //  2. docker tag <version> latest
 //  3. For each container in order (engram-saas, then engram-selfhost):
 //     a. sed Unraid template XML to pin <Repository> tag

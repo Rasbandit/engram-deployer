@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Rasbandit/engram-deployer/internal/oidctest"
+	"github.com/engram-app/engram-deployer/internal/oidctest"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -22,9 +22,9 @@ func validClaims(jti string) jwt.MapClaims {
 		"nbf":          now.Unix(),
 		"exp":          now.Add(15 * time.Minute).Unix(),
 		"jti":          jti,
-		"repository":   "Rasbandit/Engram",
+		"repository":   "engram-app/Engram",
 		"ref":          "refs/heads/main",
-		"workflow_ref": "Rasbandit/Engram/.github/workflows/ci.yml@refs/heads/main",
+		"workflow_ref": "engram-app/Engram/.github/workflows/ci.yml@refs/heads/main",
 	}
 }
 
@@ -33,9 +33,9 @@ func validConfig(iss *oidctest.Issuer) OIDCConfig {
 		JWKSURL:     iss.JWKSURL(),
 		Issuer:      "https://token.actions.githubusercontent.com",
 		Audience:    "engram-deploy",
-		Repository:  "Rasbandit/Engram",
+		Repository:  "engram-app/Engram",
 		Ref:         "refs/heads/main",
-		WorkflowRef: "Rasbandit/Engram/.github/workflows/ci.yml@refs/heads/main",
+		WorkflowRef: "engram-app/Engram/.github/workflows/ci.yml@refs/heads/main",
 	}
 }
 
@@ -72,10 +72,10 @@ func TestOIDCValidator_RejectsInvalidClaims(t *testing.T) {
 	}{
 		{"wrong audience", func(c jwt.MapClaims) { c["aud"] = "some-other-aud" }},
 		{"wrong issuer", func(c jwt.MapClaims) { c["iss"] = "https://evil.example.com" }},
-		{"wrong repository", func(c jwt.MapClaims) { c["repository"] = "Rasbandit/Evil" }},
+		{"wrong repository", func(c jwt.MapClaims) { c["repository"] = "engram-app/Evil" }},
 		{"wrong ref", func(c jwt.MapClaims) { c["ref"] = "refs/heads/attacker" }},
 		{"wrong workflow_ref", func(c jwt.MapClaims) {
-			c["workflow_ref"] = "Rasbandit/Engram/.github/workflows/evil.yml@refs/heads/main"
+			c["workflow_ref"] = "engram-app/Engram/.github/workflows/evil.yml@refs/heads/main"
 		}},
 		{"expired", func(c jwt.MapClaims) {
 			c["iat"] = time.Now().Add(-1 * time.Hour).Unix()
