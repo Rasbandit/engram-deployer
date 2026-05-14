@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Rasbandit/engram-deployer/internal/server"
+	"github.com/engram-app/engram-deployer/internal/server"
 )
 
 type fakePuller struct {
@@ -73,15 +73,15 @@ func writeTemplate(t *testing.T, dir, name, image, version string) string {
 func newOrchestratorTestHarness(t *testing.T) (*Orchestrator, *fakePuller, *fakeUpdater, *fakeHealth, string) {
 	t.Helper()
 	dir := t.TempDir()
-	writeTemplate(t, dir, "engram-saas", "ghcr.io/rasbandit/engram", "0.5.60")
-	writeTemplate(t, dir, "engram-selfhost", "ghcr.io/rasbandit/engram", "0.5.60")
+	writeTemplate(t, dir, "engram-saas", "ghcr.io/engram-app/engram", "0.5.60")
+	writeTemplate(t, dir, "engram-selfhost", "ghcr.io/engram-app/engram", "0.5.60")
 
 	puller := &fakePuller{}
 	updater := &fakeUpdater{}
 	health := &fakeHealth{}
 
 	o := &Orchestrator{
-		Image:       "ghcr.io/rasbandit/engram",
+		Image:       "ghcr.io/engram-app/engram",
 		TemplateDir: dir,
 		Containers: []ContainerSpec{
 			{Name: "engram-saas", Port: 8000},
@@ -117,10 +117,10 @@ func TestOrchestrator_HappyPath(t *testing.T) {
 	emitted := <-doneEvents
 
 	// Exactly one pull, one tag.
-	if want := []string{"ghcr.io/rasbandit/engram:0.5.61"}; !equalSlices(puller.pullArgs, want) {
+	if want := []string{"ghcr.io/engram-app/engram:0.5.61"}; !equalSlices(puller.pullArgs, want) {
 		t.Errorf("pull args = %v, want %v", puller.pullArgs, want)
 	}
-	if want := []string{"ghcr.io/rasbandit/engram:0.5.61 ghcr.io/rasbandit/engram:latest"}; !equalSlices(puller.tagArgs, want) {
+	if want := []string{"ghcr.io/engram-app/engram:0.5.61 ghcr.io/engram-app/engram:latest"}; !equalSlices(puller.tagArgs, want) {
 		t.Errorf("tag args = %v, want %v", puller.tagArgs, want)
 	}
 
@@ -141,7 +141,7 @@ func TestOrchestrator_HappyPath(t *testing.T) {
 	// Template files were rewritten.
 	for _, name := range []string{"engram-saas", "engram-selfhost"} {
 		body, _ := os.ReadFile(filepath.Join(dir, "my-"+name+".xml"))
-		if !strings.Contains(string(body), "<Repository>ghcr.io/rasbandit/engram:0.5.61</Repository>") {
+		if !strings.Contains(string(body), "<Repository>ghcr.io/engram-app/engram:0.5.61</Repository>") {
 			t.Errorf("template %s not rewritten:\n%s", name, body)
 		}
 	}

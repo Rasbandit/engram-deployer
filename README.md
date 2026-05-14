@@ -1,6 +1,6 @@
 # engram-deployer
 
-Pull-based deploy daemon for [Engram](https://github.com/Rasbandit/Engram) on
+Pull-based deploy daemon for [Engram](https://github.com/engram-app/Engram) on
 FastRaid. Replaces the previous CI-pushes-via-SSH-as-root pattern.
 
 ## Why
@@ -39,7 +39,7 @@ installed via Unraid plugin) and executes the deploy locally. Runner holds
 Three independent gates on every `/deploy`:
 
 1. **OIDC** — JWT signature verified against GitHub's JWKS. Claims allowlisted:
-   `aud=engram-deploy`, `repository=Rasbandit/Engram`, `ref=refs/heads/main`,
+   `aud=engram-deploy`, `repository=engram-app/Engram`, `ref=refs/heads/main`,
    `workflow_ref` pinned to the deploy workflow file.
 2. **JTI replay** — each token's `jti` is recorded; second sighting refused.
 3. **Source IP allowlist** — only the runner VM's IP at the daemon layer

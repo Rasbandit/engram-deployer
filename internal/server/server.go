@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Rasbandit/engram-deployer/internal/auth"
+	"github.com/engram-app/engram-deployer/internal/auth"
 )
 
 // Config bundles the dependencies a Server needs.

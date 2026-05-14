@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Rasbandit/engram-deployer/internal/server"
+	"github.com/engram-app/engram-deployer/internal/server"
 )
 
 // ContainerSpec describes one of the engram containers managed on FastRaid.
@@ -38,7 +38,7 @@ type Health interface {
 // previously lived in fastraid-deploy.sh: pull, tag, then per-container
 // (template-rewrite, update_container, health-wait), in order, fail-fast.
 type Orchestrator struct {
-	Image       string          // e.g. "ghcr.io/rasbandit/engram"
+	Image       string          // e.g. "ghcr.io/engram-app/engram"
 	TemplateDir string          // e.g. "/boot/config/plugins/dockerMan/templates-user"
 	Containers  []ContainerSpec // order matters: SaaS before selfhost
 	Puller      Puller

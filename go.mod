@@ -1,4 +1,4 @@
-module github.com/Rasbandit/engram-deployer
+module github.com/engram-app/engram-deployer
 
 go 1.23
 

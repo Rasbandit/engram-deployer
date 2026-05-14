@@ -15,9 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Rasbandit/engram-deployer/internal/auth"
-	"github.com/Rasbandit/engram-deployer/internal/deploy"
-	"github.com/Rasbandit/engram-deployer/internal/server"
+	"github.com/engram-app/engram-deployer/internal/auth"
+	"github.com/engram-app/engram-deployer/internal/deploy"
+	"github.com/engram-app/engram-deployer/internal/server"
 )
 
 type config struct {
@@ -53,7 +53,7 @@ func loadConfig() (config, error) {
 		WorkflowRef: os.Getenv("DEPLOYER_WORKFLOW_REF"),
 		AllowedIPs:  splitCSV(os.Getenv("DEPLOYER_ALLOWED_IPS")),
 
-		Image:               envOr("DEPLOYER_IMAGE", "ghcr.io/rasbandit/engram"),
+		Image:               envOr("DEPLOYER_IMAGE", "ghcr.io/engram-app/engram"),
 		TemplateDir:         envOr("DEPLOYER_TEMPLATE_DIR", "/boot/config/plugins/dockerMan/templates-user"),
 		DockerPath:          envOr("DEPLOYER_DOCKER_PATH", "docker"),
 		UpdateContainerPath: envOr("DEPLOYER_UPDATE_CONTAINER_PATH", deploy.DefaultUpdateContainerPath),
